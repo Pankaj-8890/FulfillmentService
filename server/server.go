@@ -1,15 +1,16 @@
-package server
+package main
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"fulfillmentService/middleware"
+	"fulfillmentService/model"
 	pb "fulfillmentService/proto"
 	"log"
 	"net"
 
 	"google.golang.org/grpc"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -20,33 +21,7 @@ type Server struct {
 	pb.FulfillmentServer
 }
 
-type DeliveryPerson struct {
-	gorm.Model
-	ID       int64  `json:"id" gorm:"autoIncrement"`
-	Name     string `json:"name"`
-	Location string `json:"location"`
-}
-
-func DatabaseConnection() {
-	host := "localhost"
-	port := "5432"
-	dbName := "fulfillment"
-	dbUser := "postgres"
-	password := "postgres"
-	dsn := fmt.Sprintf("host=%s port=%s user=%s dbname=%s password=%s sslmode=disable", host, port, dbUser, dbName, password)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal("Error connecting to the database...", err)
-	}
-	fmt.Println("Database connection successful...")
-
-	// Auto-migrate models
-	db.AutoMigrate(&DeliveryPerson{})
-
-}
-
-func Init() {
+func main() {
 	lis, err := net.Listen("tcp", add)
 
 	if err != nil {
@@ -56,34 +31,91 @@ func Init() {
 	log.Printf("listening %s\n", add)
 
 	s := grpc.NewServer()
-	pb.RegisterFulfillmentServer(s, &Server{})
+	dbClient := middleware.DatabaseConnection()
+	serviceDb := model.NewServiceDb(dbClient)
+	pb.RegisterFulfillmentServer(s, &Server{DB: serviceDb.DB})
 	if err = s.Serve(lis); err != nil {
 		log.Fatalf("failed to server %v\n", err)
 	}
 }
 
-func (s *Server) CreateDeliveryPerson(ctx context.Context, req *pb.CreateRequest) (*pb.CreateResponse, error) {
+func (s *Server) AssignedOrder(ctx context.Context, req *pb.AssignedOrderRequest) (*pb.AssignedOrderResponse, error) {
 
-	deliveryPerson := DeliveryPerson{
-		Name: req.DeliveryPerson.Name,
-		Location: req.DeliveryPerson.Location,
+	order := req.GetOrder()
+
+	if order.OrderStatus == string(model.ASSIGNED) || order.OrderStatus == string(model.DELIVERED) {
+		return nil, fmt.Errorf("order is already assigned or delivered")
 	}
 
-	res := s.DB.Create(&deliveryPerson)
+	var deliveryPerson model.DeliveryPerson
 
-	if res.RowsAffected == 0 {
-		return nil, errors.New("delivery person creation failed")
+	res := s.DB.First(&deliveryPerson, "location = ? AND availablity = ?", order.Location, true)
+
+	if res.Error != nil {
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("no delivery person available right now")
+		}
+		return nil, res.Error
 	}
 
-	d := &pb.DeliveryPerson{
-		Name: deliveryPerson.Name,
-		Location: deliveryPerson.Location,
+	od := model.Order{
+		Location:    order.Location,
+		OrderStatus: model.ASSIGNED,
 	}
 
-	response := &pb.CreateResponse{
-		DeliveryPerson: d,
-		Message:        "Delivery person successfully created",
+	deliveryPerson.Orders = append(deliveryPerson.Orders, od)
+	deliveryPerson.Availablity = false
+	s.DB.Save(&deliveryPerson)
+
+	order.DeliveryPersonId = deliveryPerson.ID
+	order.OrderStatus = string(model.ASSIGNED)
+
+	response := &pb.AssignedOrderResponse{
+		Order: order,
 	}
 
 	return response, nil
+
+}
+
+func (s *Server) UpdateStatus(ctx context.Context, req *pb.UpdateStatusRequest) (*pb.UpdateStatusResponse, error) {
+
+	deliveryPersonId := req.DeliveryPersonId
+	orderId := req.OrderId
+	orderStatus := req.OrderStatus
+
+	var order model.Order
+	res := s.DB.Where("delivery_person_id = ? AND id = ? AND order_status NOT LIKE ?", deliveryPersonId,orderId,string(model.DELIVERED)).Find(&order)
+	order.OrderStatus = model.DeliveryStatus(orderStatus)
+
+	if res.RowsAffected == 0 {
+		return nil, fmt.Errorf("no order found with this deliveryPerson")
+	}
+
+	s.DB.Save(&order)
+
+	
+
+	var deliveryPerson model.DeliveryPerson
+	res1 := s.DB.Model(&deliveryPerson).Where("id = ?",deliveryPersonId).Update("availablity",true)
+
+	if res1.Error != nil {
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("no deliveryPerson found")
+		}
+		return nil, res.Error
+	}
+
+
+	response := &pb.UpdateStatusResponse{
+		Order: &pb.Order{
+			Id: orderId,
+			Location: order.Location,
+			OrderStatus: string(order.OrderStatus),
+			DeliveryPersonId: order.DeliveryPersonID,
+		},
+	}
+
+	return response,nil
+
 }

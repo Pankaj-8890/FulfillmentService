@@ -22,8 +22,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type FulfillmentClient interface {
-	CreateDeliveryPerson(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
 	AssignedOrder(ctx context.Context, in *AssignedOrderRequest, opts ...grpc.CallOption) (*AssignedOrderResponse, error)
+	UpdateStatus(ctx context.Context, in *UpdateStatusRequest, opts ...grpc.CallOption) (*UpdateStatusResponse, error)
 }
 
 type fulfillmentClient struct {
@@ -32,15 +32,6 @@ type fulfillmentClient struct {
 
 func NewFulfillmentClient(cc grpc.ClientConnInterface) FulfillmentClient {
 	return &fulfillmentClient{cc}
-}
-
-func (c *fulfillmentClient) CreateDeliveryPerson(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error) {
-	out := new(CreateResponse)
-	err := c.cc.Invoke(ctx, "/FulfillmentService.fulfillment/CreateDeliveryPerson", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *fulfillmentClient) AssignedOrder(ctx context.Context, in *AssignedOrderRequest, opts ...grpc.CallOption) (*AssignedOrderResponse, error) {
@@ -52,12 +43,21 @@ func (c *fulfillmentClient) AssignedOrder(ctx context.Context, in *AssignedOrder
 	return out, nil
 }
 
+func (c *fulfillmentClient) UpdateStatus(ctx context.Context, in *UpdateStatusRequest, opts ...grpc.CallOption) (*UpdateStatusResponse, error) {
+	out := new(UpdateStatusResponse)
+	err := c.cc.Invoke(ctx, "/FulfillmentService.fulfillment/UpdateStatus", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FulfillmentServer is the server API for Fulfillment service.
 // All implementations must embed UnimplementedFulfillmentServer
 // for forward compatibility
 type FulfillmentServer interface {
-	CreateDeliveryPerson(context.Context, *CreateRequest) (*CreateResponse, error)
 	AssignedOrder(context.Context, *AssignedOrderRequest) (*AssignedOrderResponse, error)
+	UpdateStatus(context.Context, *UpdateStatusRequest) (*UpdateStatusResponse, error)
 	mustEmbedUnimplementedFulfillmentServer()
 }
 
@@ -65,11 +65,11 @@ type FulfillmentServer interface {
 type UnimplementedFulfillmentServer struct {
 }
 
-func (UnimplementedFulfillmentServer) CreateDeliveryPerson(context.Context, *CreateRequest) (*CreateResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateDeliveryPerson not implemented")
-}
 func (UnimplementedFulfillmentServer) AssignedOrder(context.Context, *AssignedOrderRequest) (*AssignedOrderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AssignedOrder not implemented")
+}
+func (UnimplementedFulfillmentServer) UpdateStatus(context.Context, *UpdateStatusRequest) (*UpdateStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateStatus not implemented")
 }
 func (UnimplementedFulfillmentServer) mustEmbedUnimplementedFulfillmentServer() {}
 
@@ -82,24 +82,6 @@ type UnsafeFulfillmentServer interface {
 
 func RegisterFulfillmentServer(s grpc.ServiceRegistrar, srv FulfillmentServer) {
 	s.RegisterService(&Fulfillment_ServiceDesc, srv)
-}
-
-func _Fulfillment_CreateDeliveryPerson_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(FulfillmentServer).CreateDeliveryPerson(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/FulfillmentService.fulfillment/CreateDeliveryPerson",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(FulfillmentServer).CreateDeliveryPerson(ctx, req.(*CreateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _Fulfillment_AssignedOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -120,6 +102,24 @@ func _Fulfillment_AssignedOrder_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Fulfillment_UpdateStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FulfillmentServer).UpdateStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/FulfillmentService.fulfillment/UpdateStatus",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FulfillmentServer).UpdateStatus(ctx, req.(*UpdateStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Fulfillment_ServiceDesc is the grpc.ServiceDesc for Fulfillment service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -128,12 +128,12 @@ var Fulfillment_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*FulfillmentServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateDeliveryPerson",
-			Handler:    _Fulfillment_CreateDeliveryPerson_Handler,
-		},
-		{
 			MethodName: "AssignedOrder",
 			Handler:    _Fulfillment_AssignedOrder_Handler,
+		},
+		{
+			MethodName: "UpdateStatus",
+			Handler:    _Fulfillment_UpdateStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -8,35 +8,38 @@ message Order{
     int64 id = 1;
     string location = 2;
     string orderStatus = 3;
+    int64 deliveryPersonId = 4;
 }
 
-message AssignedOrderRequest{
+message AssignedOrderRequest {
     Order order = 1;
 }
 
 message AssignedOrderResponse{
-    DeliveryPerson deliveryPerson = 1;
-    string orderStatus = 2;
+   Order order = 1;
 }
 
 message DeliveryPerson{
     int64 id = 1;
     string name = 2;
-    string location = 3;
+    bool availablity = 3;
+    string location = 4;
+    repeated Order orders = 5;
 }
 
-message CreateRequest{
-    DeliveryPerson deliveryPerson = 1;
+message UpdateStatusRequest{
+    int64 deliveryPersonId = 1;
+    int64 orderId = 2;
+    string orderStatus = 3; 
 }
 
-message CreateResponse{
-    DeliveryPerson deliveryPerson = 1;
-    string message = 2;
+message UpdateStatusResponse{
+    Order order = 1;
 }
 
 service fulfillment{
-    rpc CreateDeliveryPerson(CreateRequest) returns (CreateResponse);
     rpc AssignedOrder(AssignedOrderRequest) returns (AssignedOrderResponse);
+    rpc UpdateStatus(UpdateStatusRequest) returns (UpdateStatusResponse);
 }
 
 // protoc -Iproto --go_out=.  --go_opt=module=fulfillmentService --go-grpc_out=. --go-grpc_opt=module=fulfillmentService proto/fulfillment.proto
