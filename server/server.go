@@ -43,10 +43,6 @@ func (s *Server) AssignedOrder(ctx context.Context, req *pb.AssignedOrderRequest
 
 	order := req.GetOrder()
 
-	if order.OrderStatus == string(model.ASSIGNED) || order.OrderStatus == string(model.DELIVERED) {
-		return nil, fmt.Errorf("order is already assigned or delivered")
-	}
-
 	var deliveryPerson model.DeliveryPerson
 
 	res := s.DB.First(&deliveryPerson, "location = ? AND availablity = ?", order.Location, true)
@@ -67,11 +63,9 @@ func (s *Server) AssignedOrder(ctx context.Context, req *pb.AssignedOrderRequest
 	deliveryPerson.Availablity = false
 	s.DB.Save(&deliveryPerson)
 
-	order.DeliveryPersonId = deliveryPerson.ID
-	order.OrderStatus = string(model.ASSIGNED)
 
 	response := &pb.AssignedOrderResponse{
-		Order: order,
+		Message: "Order successfully assigned",
 	}
 
 	return response, nil
@@ -108,12 +102,8 @@ func (s *Server) UpdateStatus(ctx context.Context, req *pb.UpdateStatusRequest) 
 
 
 	response := &pb.UpdateStatusResponse{
-		Order: &pb.Order{
-			Id: orderId,
-			Location: order.Location,
-			OrderStatus: string(order.OrderStatus),
-			DeliveryPersonId: order.DeliveryPersonID,
-		},
+		Message:"Update order status successfully",
+		OrderStatus: orderStatus,
 	}
 
 	return response,nil
